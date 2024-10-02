@@ -2,39 +2,57 @@
 // Client.java
 import java.io.*;
 import java.net.*;
+import java.util.function.Consumer;
 
 public class Client {
-    private static final String SERVER_ADDRESS = "localhost";
-    private static final int SERVER_PORT = 5000;
+    private String serverAddress;
+    private int serverPort;
+    private Socket socket;
+    private PrintWriter out;
+    private BufferedReader in;
+    private Consumer<String> messageHandler;
 
-    public static void main(String[] args) {
-        try (Socket socket = new Socket(SERVER_ADDRESS, SERVER_PORT);
-                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-                PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+    public Client(String serverAddress, int serverPort) {
+        this.serverAddress = serverAddress;
+        this.serverPort = serverPort;
+    }
 
-            System.out.println("Connected to server");
+    public void connect() throws IOException {
+        socket = new Socket(serverAddress, serverPort);
+        out = new PrintWriter(socket.getOutputStream(), true);
+        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        System.out.println("Connected to server");
 
-            // Start a thread to read messages from the server
-            new Thread(() -> {
-                try {
-                    String message;
-                    while ((message = in.readLine()) != null) {
+        // Start a thread to read messages from the server
+        new Thread(() -> {
+            try {
+                String message;
+                while ((message = in.readLine()) != null) {
+                    if (messageHandler != null) {
+                        messageHandler.accept(message);
+                    } else {
                         System.out.println("Received from server: " + message);
                     }
-                } catch (IOException e) {
-                    System.out.println("Disconnected from server");
                 }
-            }).start();
-
-            // Main thread can be used to send messages to the server if needed
-            BufferedReader consoleReader = new BufferedReader(new InputStreamReader(System.in));
-            String userInput;
-            while ((userInput = consoleReader.readLine()) != null) {
-                out.println(userInput);
+            } catch (IOException e) {
+                System.out.println("Disconnected from server");
             }
+        }).start();
+    }
 
-        } catch (IOException e) {
-            e.printStackTrace();
+    public void sendMessage(String message) {
+        if (out != null) {
+            out.println(message);
+        }
+    }
+
+    public void setMessageHandler(Consumer<String> handler) {
+        this.messageHandler = handler;
+    }
+
+    public void disconnect() throws IOException {
+        if (socket != null && !socket.isClosed()) {
+            socket.close();
         }
     }
 }

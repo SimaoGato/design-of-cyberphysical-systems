@@ -1,24 +1,54 @@
+
 // Server.java
 import java.io.*;
 import java.net.*;
 import java.util.*;
 
 public class Server {
-    private static final int PORT = 5000;
+    private static final int DEFAULT_PORT = 5000;
+    private int port;
+    private ServerSocket serverSocket;
     private List<ClientHandler> clients = new ArrayList<>();
+    private boolean running = false;
 
-    public void start() {
-        try (ServerSocket serverSocket = new ServerSocket(PORT)) {
-            System.out.println("Server started on port " + PORT);
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                System.out.println("New client connected: " + clientSocket);
-                ClientHandler clientHandler = new ClientHandler(clientSocket, clients.size() + 1);
-                clients.add(clientHandler);
-                new Thread(clientHandler).start();
+    public Server() {
+        this(DEFAULT_PORT);
+    }
+
+    public Server(int port) {
+        this.port = port;
+    }
+
+    public void start() throws IOException {
+        serverSocket = new ServerSocket(port);
+        running = true;
+        System.out.println("Server started on port " + port);
+
+        new Thread(() -> {
+            while (running) {
+                try {
+                    Socket clientSocket = serverSocket.accept();
+                    System.out.println("New client connected: " + clientSocket);
+                    ClientHandler clientHandler = new ClientHandler(clientSocket, clients.size() + 1);
+                    clients.add(clientHandler);
+                    new Thread(clientHandler).start();
+                } catch (IOException e) {
+                    if (running) {
+                        e.printStackTrace();
+                    }
+                }
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        }).start();
+    }
+
+    public void stop() throws IOException {
+        running = false;
+        for (ClientHandler client : clients) {
+            client.close();
+        }
+        clients.clear();
+        if (serverSocket != null && !serverSocket.isClosed()) {
+            serverSocket.close();
         }
     }
 
@@ -34,6 +64,7 @@ public class Server {
     private class ClientHandler implements Runnable {
         private Socket socket;
         private PrintWriter out;
+        private BufferedReader in;
         private int clientNumber;
 
         public ClientHandler(Socket socket, int clientNumber) {
@@ -41,6 +72,7 @@ public class Server {
             this.clientNumber = clientNumber;
             try {
                 this.out = new PrintWriter(socket.getOutputStream(), true);
+                this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -50,48 +82,30 @@ public class Server {
             out.println(message);
         }
 
+        public void close() throws IOException {
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+            }
+        }
+
         @Override
         public void run() {
             try {
-                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
                 String message;
                 while ((message = in.readLine()) != null) {
                     System.out.println("Received from client " + clientNumber + ": " + message);
+                    // You can add custom message handling here
                 }
             } catch (IOException e) {
                 System.out.println("Client " + clientNumber + " disconnected");
             } finally {
                 clients.remove(this);
                 try {
-                    socket.close();
+                    close();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         }
-    }
-
-    public static void main(String[] args) {
-        Server server = new Server();
-        new Thread(() -> {
-            Scanner scanner = new Scanner(System.in);
-            while (true) {
-                System.out.print("Enter client number and message (e.g., '1 Hello'): ");
-                String input = scanner.nextLine();
-                String[] parts = input.split(" ", 2);
-                if (parts.length == 2) {
-                    try {
-                        int clientNumber = Integer.parseInt(parts[0]);
-                        String message = parts[1];
-                        server.sendToClient(clientNumber, message);
-                    } catch (NumberFormatException e) {
-                        System.out.println("Invalid client number. Please enter a number followed by a message.");
-                    }
-                } else {
-                    System.out.println("Invalid input. Please enter a client number followed by a message.");
-                }
-            }
-        }).start();
-        server.start();
     }
 }
