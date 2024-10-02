@@ -1,111 +1,80 @@
 package exercises.trafficlight;
 
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics;
-import java.awt.GridLayout;
+import com.pi4j.io.gpio.*;
 
-import javax.swing.JFrame;
-import javax.swing.JPanel;
+public class TrafficLight {
 
-public class TrafficLight extends JFrame {
-	
-	private Signal green = new Signal(Color.green);
-	private Signal yellow = new Signal(Color.yellow);
-	private Signal red = new Signal(Color.red);
+    private final GpioPinDigitalOutput _green;
+    private final GpioPinDigitalOutput _yellow;
+    private final GpioPinDigitalOutput _red;
 
-	public TrafficLight(String title, boolean showYellow){
-		super(title);
-		getContentPane().setLayout(new GridLayout(1, 1));
-		green.turnOn(false);
-		yellow.turnOn(false);
-		red.turnOn(false);
+    private final static String GREEN = "Green";
+	private final static String YELLOW = "Yellow";
+	private final static String RED = "Red";
 
-		JPanel p1;
-		if(showYellow) {
-			p1 = new JPanel(new GridLayout(3,1));
-			p1.add(red);
-			p1.add(yellow);
+    public TrafficLight(GpioController gpio, String title, boolean showYellow, com.pi4j.io.gpio.Pin greenPin, com.pi4j.io.gpio.Pin yellowPin, com.pi4j.io.gpio.Pin redPin) {
+
+        _green = gpio.provisionDigitalOutputPin(greenPin, GREEN + title, PinState.LOW);
+		if (yellowPin != null) {
+			_yellow = gpio.provisionDigitalOutputPin(yellowPin, YELLOW + title, PinState.LOW);
 		} else {
-			p1 = new JPanel(new GridLayout(2,1));
-			p1.add(red);
+			_yellow = null;
 		}
-		p1.add(green);
+		_red = gpio.provisionDigitalOutputPin(redPin, RED + title, PinState.LOW);
 
-		getContentPane().add(p1);
-		pack();
-	}
-	
-	public void showGreen() {
-		red.turnOn(false);
-		if(yellow!=null) yellow.turnOn(false);
-		green.turnOn(true);
-	}
+		_green.setShutdownOptions(true, PinState.LOW);
+		if (_yellow != null)
+			_yellow.setShutdownOptions(true, PinState.LOW);
+		_red.setShutdownOptions(true, PinState.LOW);
+    }
 
-	public void showRed() {
-		red.turnOn(true);
-		if(yellow!=null) yellow.turnOn(false);
-		green.turnOn(false);
-	}
-
-	public void showRedYellow() {
-		if(yellow==null) {
-			throw new UnsupportedOperationException("Traffic light has no yellow light.");
-		}
-		red.turnOn(true);
-		yellow.turnOn(true);
-		green.turnOn(false);
-	}
-
-	public void showYellow() {
-		if(yellow==null) {
-			throw new UnsupportedOperationException("Traffic light has no yellow light.");
-		}
-		red.turnOn(false);
-		yellow.turnOn(true);
-		green.turnOn(false);
-	}
-
-	public void switchAllOff() {
-		red.turnOn(false);
-		if(yellow!=null) yellow.turnOn(false);
-		green.turnOn(false);
-	}
-	
-	
-	private static class Signal extends JPanel{
-
-		Color on;
-		int radius = 40;
-		int border = 10;
-		boolean change;
-
-		Signal(Color color){
-			on = color;
-			change = true;
-		}
-
-		public void turnOn(boolean a){
-			change = a;
-			repaint();        
-		}
-
-		public Dimension getPreferredSize(){
-			int size = (radius+border)*2;
-			return new Dimension( size, size );
-		}
-
-		public void paintComponent(Graphics g){
-			g.setColor( Color.black );
-			g.fillRect(0,0,getWidth(),getHeight());
-
-			if (change){
-				g.setColor( on );
-			} else {
-				g.setColor( on.darker().darker().darker() );
-			}
-			g.fillOval( border,border,2*radius,2*radius );
+	public void turnOn(GpioPinDigitalOutput pin, boolean on) {
+		if (on) {
+			pin.high();
+		} else {
+			pin.low();
 		}
 	}
-}     
 
+    public void showGreen() {
+		turnOn(_red, false);
+        if (_yellow != null)
+			turnOn(_yellow, false);
+		turnOn(_green, true);
+    }
+
+    public void showRed() {
+		turnOn(_red, true);
+        if (_yellow != null)
+			turnOn(_yellow, false);
+		turnOn(_green, false);
+    }
+
+    public void showRedYellow() {
+        if (_yellow == null) {
+            throw new UnsupportedOperationException(
+                    "Traffic light has no yellow light.");
+        }
+		turnOn(_red, true);
+		turnOn(_yellow, true);
+		turnOn(_green, false);
+    }
+
+    public void showYellow() {
+        if (_yellow == null) {
+            throw new UnsupportedOperationException(
+                    "Traffic light has no yellow light.");
+        }
+		turnOn(_red, false);
+		turnOn(_yellow, true);
+		turnOn(_green, false);
+    }
+
+    public void switchAllOff() {
+		turnOn(_red, false);
+        if (_yellow != null)
+			turnOn(_yellow, false);
+		turnOn(_green, false);
+    }
+
+}

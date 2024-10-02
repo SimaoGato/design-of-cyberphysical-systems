@@ -1,9 +1,31 @@
 package exercises.trafficlight;
 
-import runtime.EventWindow;
-import runtime.IStateMachine;
-import runtime.Scheduler;
-import runtime.Timer;
+import runtime.*;
+
+import com.pi4j.io.gpio.GpioController;
+import com.pi4j.io.gpio.GpioFactory;
+import com.pi4j.io.gpio.GpioPin;
+import com.pi4j.io.gpio.GpioPinDigitalInput;
+import com.pi4j.io.gpio.GpioPinDigitalOutput;
+import com.pi4j.io.gpio.PinDirection;
+import com.pi4j.io.gpio.PinMode;
+import com.pi4j.io.gpio.PinPullResistance;
+import com.pi4j.io.gpio.PinState;
+import com.pi4j.io.gpio.RaspiPin;
+import com.pi4j.io.gpio.trigger.GpioCallbackTrigger;
+import com.pi4j.io.gpio.trigger.GpioPulseStateTrigger;
+import com.pi4j.io.gpio.trigger.GpioSetStateTrigger;
+import com.pi4j.io.gpio.trigger.GpioSyncStateTrigger;
+import com.pi4j.io.gpio.event.GpioPinListener;
+import com.pi4j.io.gpio.event.GpioPinDigitalStateChangeEvent;
+import com.pi4j.io.gpio.event.GpioPinEvent;
+import com.pi4j.io.gpio.event.GpioPinListenerDigital;
+import com.pi4j.io.gpio.event.PinEventType;
+
+// library for thread sleep
+import java.lang.InterruptedException;
+import java.io.*;
+import java.lang.Thread;
 
 public class TrafficLightControllerMachine implements IStateMachine {
 
@@ -33,13 +55,13 @@ public class TrafficLightControllerMachine implements IStateMachine {
 	private boolean buttonHasBeenPressed = false;
 	private boolean timerHasStarted = false;
 
-	private TrafficLight cars = new TrafficLight("Cars", true);
-	private TrafficLight pedestrians = new TrafficLight("Pedestrians", false);
+	public final GpioController gpio = GpioFactory.getInstance();
+	private TrafficLight cars = new TrafficLight(gpio, "Cars", true, RaspiPin.GPIO_13, RaspiPin.GPIO_03, RaspiPin.GPIO_07);
+	private TrafficLight pedestrians = new TrafficLight(gpio, "Pedestrians", false, RaspiPin.GPIO_14, null,
+			RaspiPin.GPIO_00);
 
 	public TrafficLightControllerMachine() {
 		// initial transition
-		cars.setVisible(true);
-		pedestrians.setVisible(true);
 		cars.showGreen();
 		pedestrians.showRed();
 	}
@@ -61,7 +83,7 @@ public class TrafficLightControllerMachine implements IStateMachine {
 				}
 			} else if (event.equals(PEDESTRIAN_BUTTON_PRESSED)) {
 				buttonHasBeenPressed = true;
-				if (!timerHasStarted || event.equals(TIMER_6) ) { // first turn OR n turn t6 done, the "if" mostly entered in the first
+				if (!timerHasStarted) { // first turn OR n turn t6 done, the "if" mostly entered the first
 					buttonHasBeenPressed = false;				//turn except when the button is pressed right before the timer ends
 					t6.start(scheduler, 30000);				//in which case, it can enter this "if"
 					cars.showYellow();
@@ -118,8 +140,7 @@ public class TrafficLightControllerMachine implements IStateMachine {
 		IStateMachine stm = new TrafficLightControllerMachine();
 		Scheduler s = new Scheduler(stm);
 
-		EventWindow w = new EventWindow(EVENTS, s);
-		w.show();
+		EventButton button = new EventButton(GpioFactory.getInstance(), s);
 
 		s.start();
 	}
