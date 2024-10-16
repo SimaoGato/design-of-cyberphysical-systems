@@ -3,13 +3,12 @@ package runtime;
 import java.util.Scanner;
 import java.util.concurrent.Semaphore;
 
-import runtime.Scheduler;
-
 public class InputReader extends Thread {
 
     private java.util.concurrent.Semaphore sem;
     private Scheduler scheduler;
     private String lastInput;
+    private int count = 1;
 
     public InputReader(Scheduler s) {
         scheduler = s;
@@ -23,9 +22,12 @@ public class InputReader extends Thread {
         while (true) {
             try {
                 sem.acquire();
-                System.out.println("Enter a message: ");
-                lastInput = scanner.nextLine();
+                lastInput = Integer.toString(count);
+                count++;
                 scheduler.addToQueueLast("InputReceived");
+                if (count == 100) {
+                    break;
+                }
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }

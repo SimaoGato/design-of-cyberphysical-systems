@@ -10,11 +10,15 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import runtime.Scheduler;
 
+import java.util.Queue;
+import java.util.concurrent.LinkedBlockingQueue;
+
 public class MQTTclient implements MqttCallback {
 
 	private Scheduler scheduler;
 	private MqttClient client;
 	private String receivedMessage;
+	private Queue<String> buffer;
 
 	public MQTTclient(String broker, String myAddress, boolean conf, Scheduler s) {
 		scheduler = s;
@@ -27,6 +31,7 @@ public class MQTTclient implements MqttCallback {
 			assert client.isConnected() : "Failed to connect to broker";  // Ensure connection is successful
 			client.setCallback(this);
 			scheduler.addToQueueLast("MQTTReady ");
+			buffer = new LinkedBlockingQueue<String>();
 		}
 		catch (MqttException e) {
 			System.err.println("MQTT Exception: " + e);
@@ -100,9 +105,22 @@ public class MQTTclient implements MqttCallback {
 	// Method triggered when a message is received on a subscribed topic
 	public void messageArrived(String topic, MqttMessage mess) {
 		receivedMessage = new String(mess.getPayload());
+		buffer.add(receivedMessage);
 		System.out.println("Message received on topic: " + topic + " Message: " + receivedMessage);
 
 		// Notify scheduler about the message arrival
 		scheduler.addToQueueLast("MQTTMessageReceived");
+	}
+
+	public String messageDequeue() {
+		return buffer.poll();
+	}
+
+	public boolean hasMessages() {
+		return !buffer.isEmpty();
+	}
+
+	public String showMessages() {
+		return buffer.toString();
 	}
 }

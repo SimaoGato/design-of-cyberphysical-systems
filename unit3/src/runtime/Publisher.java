@@ -12,6 +12,7 @@ public class Publisher implements IStateMachine {
     private InputReader inputReader;
     private static final String TIMER_1 = "t1";
     private Timer t1 = new Timer("t1");
+    private Freepool freepool;
 
     public Publisher() {
 
@@ -22,6 +23,8 @@ public class Publisher implements IStateMachine {
         switch(event) {
             case "Start":
                 mqttClient = createMQTTClient();
+                mqttClient.subscribe("hatsense");
+                freepool = new Freepool(6, mqttClient);
 
                 inputReader = new InputReader(scheduler);
                 inputReader.start();
@@ -30,11 +33,19 @@ public class Publisher implements IStateMachine {
                 return EXECUTE_TRANSITION;
             case "InputReceived":
                 String userInput = inputReader.getLastInput();
-                mqttClient.sendMessage("sensehat", userInput);
+                freepool.sendData(userInput, "sensehat");
+                // mqttClient.sendMessage("sensehat", userInput);
+                if (freepool.getFreepools() > 0) {
+                    inputReader.requestInput();
+                }
+                return EXECUTE_TRANSITION;
+            case "ReceivedFreepool":
                 inputReader.requestInput();
                 return EXECUTE_TRANSITION;
             case "MQTTMessageReceived":
-                ledMatrixTicker.StartWriting(mqttClient.getLastMessage());
+                freepool.receiveFreepool("sensehat");
+                scheduler.addToQueueLast("ReceivedFreepool");
+                // ledMatrixTicker.StartWriting(mqttClient.getLastMessage());
                 return EXECUTE_TRANSITION;
             case TIMER_1:
                 ledMatrixTicker.WritingStep();
@@ -55,7 +66,7 @@ public class Publisher implements IStateMachine {
 
     private MQTTclient createMQTTClient() {
         String broker = "tcp://broker.hivemq.com:1883";
-        String myAddress = "192.168.0.194";
+        String myAddress = "192.168.0.193";
 
         return new MQTTclient(broker, myAddress, false, scheduler);
     }

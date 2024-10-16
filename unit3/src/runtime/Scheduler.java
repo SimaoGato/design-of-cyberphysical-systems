@@ -29,12 +29,12 @@ public class Scheduler extends Thread {
 				String event = inputQueue.take();
 
 				// execute a transition
-				log(name + ": firing state machine with event: " + event);
+				// log(name + ": firing state machine with event: " + event);
 				int result = stm.fire(event, this);
 				if(result==IStateMachine.DISCARD_EVENT) {
-					log(name + ": Discarded Event: " + event);
+					// log(name + ": Discarded Event: " + event);
 				} else if(result==IStateMachine.TERMINATE_SYSTEM) {
-					log(name + ": Terminating System... Good bye!");
+					// log(name + ": Terminating System... Good bye!");
 					running = false;
 				}
 			} catch (InterruptedException e) {
